@@ -1,3 +1,3 @@
-# llamingo
+# Llamingo
 
-A new Flutter project.
+An app that uses an alternative approach to translation.
