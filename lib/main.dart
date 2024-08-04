@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 
 void main() async {
   await dotenv.load(fileName: '.env');
-  String? apiKey = dotenv.env['apiKey'];
+  final String? apiKey = dotenv.env['apiKey'];
 
   if (apiKey != null) {
     final safetySettings = [
@@ -64,8 +64,8 @@ class _MyHomePageState extends State<MyHomePage> {
   FlutterTts tts = FlutterTts();
   TextEditingController inputController = TextEditingController();
   TextEditingController outputController = TextEditingController();
-
   String inputText = '';
+
   List<String> languages = [
     'English',
     'Spanish',
@@ -77,8 +77,11 @@ class _MyHomePageState extends State<MyHomePage> {
     'Italian',
   ];
 
+  late String inputLanguage;
+  late String outputLanguage;
+
   Map<String, String> languageCodeMap = {
-    'English': 'en-GB',
+    'English': 'en-US',
     'Spanish': 'es-ES',
     'French': 'fr-FR',
     'German': 'de-DE',
@@ -87,15 +90,87 @@ class _MyHomePageState extends State<MyHomePage> {
     'Russian': 'ru-RU',
     'Italian': 'it-IT',
   };
-  
-  late String inputLanguage;
-  late String outputLanguage;
 
   @override
   void initState() {
     super.initState();
     inputLanguage = languages[0];
     outputLanguage = languages[1];
+  }
+
+  TextField createTextField(TextEditingController controller, String language, bool readOnly){
+    return TextField(
+      minLines: 6,
+      maxLines: 6,
+      style: const TextStyle(fontSize: 20),
+      controller: controller,
+      decoration: InputDecoration(
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+        suffixIcon: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+          IconButton(
+            onPressed: () async {
+              await tts.setLanguage(languageCodeMap[language]!);
+              tts.speak(controller.text);
+            },
+            icon: const Icon(Icons.volume_up),
+          ),
+            IconButton(
+              onPressed: () => Clipboard.setData(ClipboardData(text: controller.text)),
+              icon: const Icon(Icons.content_copy),
+            ),
+          ],
+        ),
+        ),
+      readOnly: readOnly,
+      onChanged: (text) {
+        setState(() {
+          inputText = text;
+          
+          if (text.isEmpty) {
+            outputController.text = '';
+          }
+        });
+      },
+    );
+  }
+
+  DropdownButtonFormField<String> createDropDownButtonFormField(String language) {
+    return DropdownButtonFormField<String>(
+      isExpanded: true,
+      value: language,
+      decoration: InputDecoration(
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+      ),
+      onChanged: (String? value) {
+        setState(() {
+          if ((language == inputLanguage && value == outputLanguage) ||
+              (language == outputLanguage && value == inputLanguage)) {
+              swapLanguages();
+          } else if (language == inputLanguage) {
+              inputLanguage = value!;
+          } else if (language == outputLanguage) {
+              outputLanguage = value!;
+          }
+        });
+      },
+      items: languages.map<DropdownMenuItem<String>>((String language) {
+        return DropdownMenuItem<String>(
+          value: language,
+          child: Text(language),
+        );
+      }).toList(),
+    );
+  }
+
+  void swapLanguages() {
+    setState(() {
+      String temp = inputLanguage;
+      inputLanguage = outputLanguage;
+      outputLanguage = temp;
+    });
   }
 
   Future<String> translate(String inputText, String outputLanguage) async {
@@ -105,22 +180,9 @@ class _MyHomePageState extends State<MyHomePage> {
     return response.text!;
   }
 
-  void swapLanguages() {
-    setState(() {
-      String temp = inputLanguage;
-      inputLanguage = outputLanguage;
-      outputLanguage = temp;
-
-      temp = inputController.text;
-      inputController.text = outputController.text;
-      outputController.text = temp;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final Color backgroundColor = Theme.of(context).colorScheme.inversePrimary;
-    const int numberOfLines = 6;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -132,69 +194,14 @@ class _MyHomePageState extends State<MyHomePage> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            TextField(
-              minLines: numberOfLines,
-              maxLines: numberOfLines,
-              style: const TextStyle(fontSize: 20),
-              controller: inputController,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
-                suffixIcon: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                  IconButton(
-                    onPressed: () async {
-                      await tts.setLanguage(languageCodeMap[inputLanguage]!);
-                      tts.speak(inputController.text);
-                    },
-                    icon: const Icon(Icons.volume_up),
-                  ),
-                    IconButton(
-                      onPressed: () => Clipboard.setData(ClipboardData(text: inputController.text)),
-                      icon: const Icon(Icons.content_copy),
-                    ),
-                  ],
-                ),
-               ),
-              onChanged: (text) {
-                setState(() {
-                  inputText = text;
-
-                  if (text.isEmpty) {
-                    outputController.text = '';
-                  }
-                });
-              },
-            ),
+            createTextField(inputController, inputLanguage, false),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 20),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Expanded(
-                    child: DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      value: inputLanguage,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
-                      ),
-                      onChanged: (String? value) {
-                        setState(() {
-                            if (value == outputLanguage) {
-                              swapLanguages();
-                            } else {
-                              inputLanguage = value!;
-                            }
-                        });
-                      },
-                      items: languages.map<DropdownMenuItem<String>>((String language) {
-                        return DropdownMenuItem<String>(
-                          value: language,
-                          child: Text(language),
-                        );
-                      }).toList(),
-                    ),
+                    child: createDropDownButtonFormField(inputLanguage),
                   ),
                   const SizedBox(width: 20),
                   CircleAvatar(
@@ -207,59 +214,12 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                   const SizedBox(width: 20),
                   Expanded(
-                    child: DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      value: outputLanguage,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
-                      ),
-                      onChanged: (String? value) {
-                        setState(() {
-                            if (value == inputLanguage) {
-                              swapLanguages();
-                            } else {
-                              outputLanguage = value!;
-                            }
-                        });
-                      },
-                      items: languages.map<DropdownMenuItem<String>>((String language) {
-                        return DropdownMenuItem<String>(
-                          value: language,
-                          child: Text(language),
-                        );
-                      }).toList(),
-                    ),
+                    child: createDropDownButtonFormField(outputLanguage),
                   ),
                 ],
               ),
             ),
-            TextField(
-              minLines: numberOfLines,
-              maxLines: numberOfLines,
-              style: const TextStyle(fontSize: 20),
-              controller: outputController,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
-                suffixIcon: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    IconButton(
-                    onPressed: () async {
-                      await tts.setLanguage(languageCodeMap[outputLanguage]!);
-                      tts.speak(outputController.text);
-                    },
-                      icon: const Icon(Icons.volume_up),
-                    ),
-                    IconButton(
-                      onPressed: () => Clipboard.setData(ClipboardData(text: outputController.text)),
-                      icon: const Icon(Icons.content_copy),
-                    ),
-                  ],
-                ),
-               ),
-              readOnly: true,
-            ),
+            createTextField(outputController, outputLanguage, true),
             Padding(
               padding: const EdgeInsets.only(top: 20),
               child: MaterialButton(
